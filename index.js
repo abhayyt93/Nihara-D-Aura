@@ -16,7 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.send('Kosmatic Backend is running!');
+  res.send('Nihara D Aura backend is running!');
 });
 
 app.listen(PORT, () => {
