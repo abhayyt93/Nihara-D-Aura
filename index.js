@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
   res.send('Nihara D Aura backend is running!');
 });
 
-app.use('/api/users', userRoutes);
+app.use('/api/profile', userRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
