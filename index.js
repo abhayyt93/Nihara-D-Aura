@@ -15,9 +15,13 @@ mongoose.connect(process.env.MONGO_URI)
 app.use(cors());
 app.use(express.json());
 
+const userRoutes = require('./routes/userRoutes');
+
 app.get('/', (req, res) => {
   res.send('Nihara D Aura backend is running!');
 });
+
+app.use('/api/users', userRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
