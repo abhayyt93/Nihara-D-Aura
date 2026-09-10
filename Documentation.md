@@ -16,10 +16,8 @@
 ```
 
 ### Update Profile
-*   **Method:** `POST`
-*   **Endpoint:** `/api/profile/update`
-*   **Headers:** `Content-Type: application/json`
-*   **Body:**
+**Endpoint:** `http://3.7.180.215:3000/api/profile/update`
+
 ```json
 {
     "email": "rahul@example.com",
