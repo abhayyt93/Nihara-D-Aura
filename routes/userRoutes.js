@@ -33,6 +33,32 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Update user profile (like avatar)
+router.post('/update', async (req, res) => {
+  try {
+    const { email, avatar } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required to update profile' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (avatar !== undefined) {
+      user.avatar = avatar;
+    }
+
+    await user.save();
+    res.status(200).json({ message: 'Profile updated successfully', user });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get all user profiles
 router.get('/', async (req, res) => {
   try {

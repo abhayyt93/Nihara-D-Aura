@@ -15,6 +15,18 @@
 }
 ```
 
+### Update Profile
+*   **Method:** `POST`
+*   **Endpoint:** `/api/profile/update`
+*   **Headers:** `Content-Type: application/json`
+*   **Body:**
+```json
+{
+    "email": "rahul@example.com",
+    "avatar": "https://example.com/new-avatar.jpg"
+}
+```
+
 ---
 
 ## 2. Authentication Flow
