@@ -4,65 +4,71 @@
 
 ## 1. User Profile API
 
-**Endpoint:** `http://3.7.180.215:3000/api/profile`
-
-```json
-{
+### `POST /api/profile`
+- **Description:** Create a new user profile.
+- **Body Fields:**
+  ```json
+  {
     "fullName": "Rahul Kumar",
     "email": "rahul@example.com",
     "mobileNumber": "9876543210",
     "avatar": "https://example.com/avatar.jpg"
-}
-```
+  }
+  ```
 
-### Update Profile
-**Endpoint:** `http://3.7.180.215:3000/api/profile/update`
-
-```json
-{
+### `POST /api/profile/update`
+- **Description:** Update user profile details (like avatar).
+- **Body Fields:**
+  ```json
+  {
     "email": "rahul@example.com",
     "avatar": "https://example.com/new-avatar.jpg"
-}
-```
+  }
+  ```
+*(Can also accept avatar URL as text)*
 
 ---
 
 ## 2. Authentication Flow
 
-### Register (Send OTP)
-**Endpoint:** `http://3.7.180.215:3000/api/auth/register`
-```json
-{
+### `POST /api/auth/register`
+- **Description:** Register a new user and send an OTP to the provided email.
+- **Body Fields:**
+  ```json
+  {
     "fullName": "Rahul Kumar",
     "email": "rahul@example.com",
     "mobileNumber": "9876543210",
     "avatar": "https://example.com/avatar.jpg"
-}
-```
+  }
+  ```
 
-### Verify OTP
-**Endpoint:** `http://3.7.180.215:3000/api/auth/verify-otp`
-```json
-{
+### `POST /api/auth/verify-otp`
+- **Description:** Verify the OTP sent to the user's email.
+- **Body Fields:**
+  ```json
+  {
     "email": "rahul@example.com",
     "otp": "123456"
-}
-```
+  }
+  ```
 
-### Create Password
-**Endpoint:** `http://3.7.180.215:3000/api/auth/create-password`
-```json
-{
+### `POST /api/auth/create-password`
+- **Description:** Create a password after successful OTP verification.
+- **Body Fields:**
+  ```json
+  {
     "email": "rahul@example.com",
     "password": "mySecurePassword123"
-}
-```
+  }
+  ```
 
-### Login
-**Endpoint:** `http://3.7.180.215:3000/api/auth/login`
-```json
-{
+### `POST /api/auth/login`
+- **Description:** Login with email and password to receive a JWT token.
+- **Body Fields:**
+  ```json
+  {
     "email": "rahul@example.com",
     "password": "mySecurePassword123"
-}
-```
+  }
+  ```
