@@ -22,7 +22,7 @@ const generateOTP = () => {
 // 1. Register: Send OTP to Email
 router.post('/register', async (req, res) => {
   try {
-    const { fullName, email, mobileNumber } = req.body;
+    const { fullName, email, mobileNumber, avatar } = req.body;
 
     if (!fullName || !email || !mobileNumber) {
       return res.status(400).json({ error: 'fullName, email, and mobileNumber are required' });
@@ -37,12 +37,13 @@ router.post('/register', async (req, res) => {
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     if (!user) {
-      user = new User({ fullName, email, mobileNumber, otp, otpExpires });
+      user = new User({ fullName, email, mobileNumber, otp, otpExpires, avatar: avatar || '' });
     } else {
       user.otp = otp;
       user.otpExpires = otpExpires;
       user.fullName = fullName;
       user.mobileNumber = mobileNumber;
+      if (avatar) user.avatar = avatar;
     }
     
     await user.save();

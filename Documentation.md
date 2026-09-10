@@ -25,7 +25,8 @@
 {
     "fullName": "Rahul Kumar",
     "email": "rahul@example.com",
-    "mobileNumber": "9876543210"
+    "mobileNumber": "9876543210",
+    "avatar": "https://example.com/avatar.jpg"
 }
 ```
 
