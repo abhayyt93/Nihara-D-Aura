@@ -22,13 +22,16 @@ const generateOTP = () => {
 // 1. Register: Send OTP to Email
 router.post('/register', async (req, res) => {
   try {
-    const { fullName, email, mobileNumber, avatar } = req.body;
+    const { fullName, name, email, mobileNumber, phone, avatar } = req.body;
 
-    if (!fullName || !email || !mobileNumber) {
-      return res.status(400).json({ error: 'fullName, email, and mobileNumber are required' });
+    const resolvedName = fullName || name;
+    const resolvedPhone = mobileNumber || phone;
+
+    if (!resolvedName || !email || !resolvedPhone) {
+      return res.status(400).json({ error: 'fullName (or name), email, and mobileNumber (or phone) are required' });
     }
 
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: email.toLowerCase() });
     if (user && user.isVerified) {
       return res.status(400).json({ error: 'User with this email already exists and is verified' });
     }
@@ -37,12 +40,23 @@ router.post('/register', async (req, res) => {
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     if (!user) {
-      user = new User({ fullName, email, mobileNumber, otp, otpExpires, avatar: avatar || '' });
+      user = new User({
+        fullName: resolvedName,
+        name: resolvedName,
+        email: email.toLowerCase(),
+        mobileNumber: resolvedPhone,
+        phone: resolvedPhone,
+        otp,
+        otpExpires,
+        avatar: avatar || '',
+      });
     } else {
       user.otp = otp;
       user.otpExpires = otpExpires;
-      user.fullName = fullName;
-      user.mobileNumber = mobileNumber;
+      user.fullName = resolvedName;
+      user.name = resolvedName;
+      user.mobileNumber = resolvedPhone;
+      user.phone = resolvedPhone;
       if (avatar) user.avatar = avatar;
     }
     
@@ -56,7 +70,7 @@ router.post('/register', async (req, res) => {
         from: process.env.EMAIL_USER,
         to: email,
         subject: 'Your OTP for Nihara D Aura',
-        text: `Hello ${fullName},\n\nYour OTP for registration is: ${otp}\nIt will expire in 10 minutes.`,
+        text: `Hello ${resolvedName},\n\nYour OTP for registration is: ${otp}\nIt will expire in 10 minutes.`,
       };
       await transporter.sendMail(mailOptions);
     }
@@ -77,7 +91,7 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'email and otp are required' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -108,7 +122,7 @@ router.post('/create-password', async (req, res) => {
       return res.status(400).json({ error: 'email and password are required' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -138,7 +152,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'email and password are required' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user || !user.isVerified) {
       return res.status(400).json({ error: 'Invalid credentials or user not verified' });
@@ -160,7 +174,20 @@ router.post('/login', async (req, res) => {
 
     jwt.sign(payload, jwtSecret, { expiresIn: '7d' }, (err, token) => {
       if (err) throw err;
-      res.status(200).json({ token, user: { id: user.id, fullName: user.fullName, email: user.email } });
+      res.status(200).json({
+        token,
+        user: {
+          id: user.id,
+          fullName: user.fullName || user.name,
+          name: user.name || user.fullName,
+          email: user.email,
+          mobileNumber: user.mobileNumber || user.phone,
+          phone: user.phone || user.mobileNumber,
+          avatar: user.avatar,
+          tier: user.tier,
+          rewardPoints: user.rewardPoints,
+        }
+      });
     });
 
   } catch (error) {
