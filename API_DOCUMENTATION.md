@@ -9,7 +9,7 @@
 ---
 
 ## Table of Contents
-1. [Authentication APIs (`/api/auth`)](#1-authentication-apis-apiauth)
+1. [Authentication APIs - Passwordless OTP (`/api/auth`)](#1-authentication-apis---passwordless-otp-apiauth)
 2. [User Profile APIs (`/api/profile`)](#2-user-profile-apis-apiprofile)
 3. [Products APIs (`/api/products`)](#3-products-apis-apiproducts)
 4. [Categories APIs (`/api/categories`)](#4-categories-apis-apicategories)
@@ -18,33 +18,52 @@
 
 ---
 
-## 1. Authentication APIs (`/api/auth`)
+## 1. Authentication APIs - Passwordless OTP (`/api/auth`)
+*Poora authentication system **Email aur Name** par chalta hai via 6-digit OTP verification. Koi password ki zaroorat nahi hai.*
 
-### 1.1 Register User (Send OTP)
+### 1.1 Register New User (Send OTP)
 - **Endpoint:** `POST /api/auth/register`
-- **Description:** Initiates new user registration using Full Name and Email. Generates a 6-digit OTP, saves user as unverified, and sends OTP to the user's email (also logs in server console for testing).
+- **Description:** Initiates new user registration using Full Name and Email. Generates a 6-digit OTP and sends it to the user's email (also logs in server console for testing).
 - **Request Body:**
   ```json
   {
     "fullName": "Priya Sharma",
-    "email": "priya@example.com",
-    "mobileNumber": "9876543210"
+    "email": "priya@example.com"
   }
   ```
-  *(Note: `fullName` or `name` and `email` are required. `mobileNumber` or `phone` and `avatar` are optional.)*
+  *(Note: `fullName` or `name` and `email` are required. `mobileNumber` or `phone` is optional.)*
 - **Response (200 OK):**
   ```json
   {
-    "message": "OTP sent successfully to email",
+    "message": "OTP sent successfully to your email",
     "email": "priya@example.com"
   }
   ```
 
 ---
 
-### 1.2 Verify OTP (Account Created & Auto-Login)
+### 1.2 Login Existing User (Send Login OTP)
+- **Endpoint:** `POST /api/auth/login`
+- **Description:** For existing users to log in. User provides email and receives a 6-digit OTP.
+- **Request Body:**
+  ```json
+  {
+    "email": "priya@example.com"
+  }
+  ```
+- **Response (200 OK):**
+  ```json
+  {
+    "message": "Login OTP sent successfully to your email",
+    "email": "priya@example.com"
+  }
+  ```
+
+---
+
+### 1.3 Verify OTP (Account Created / Logged In)
 - **Endpoint:** `POST /api/auth/verify-otp`
-- **Description:** Verifies the 6-digit OTP sent to the email. Upon success, marks the account verified (`isVerified: true`), creates the user session, and returns a JWT auth token and user profile.
+- **Description:** Verifies the 6-digit OTP for either Registration or Login. On success, creates/activates the account and returns a 30-day JWT auth token with the full user profile.
 - **Request Body:**
   ```json
   {
@@ -55,68 +74,19 @@
 - **Response (200 OK):**
   ```json
   {
-    "message": "Account verified and created successfully",
+    "message": "Account verified successfully",
     "token": "eyJhbGciOiJIUzI1NiIsIn...",
     "user": {
       "id": "673f4e19876a1c5d01234567",
       "fullName": "Priya Sharma",
       "name": "Priya Sharma",
       "email": "priya@example.com",
-      "mobileNumber": "9876543210",
-      "phone": "9876543210",
+      "mobileNumber": "",
+      "phone": "",
       "avatar": "",
       "tier": "Royal Member",
       "rewardPoints": 0,
       "isVerified": true
-    }
-  }
-  ```
-
----
-
-### 1.3 Create / Set Password (Optional)
-- **Endpoint:** `POST /api/auth/create-password`
-- **Description:** Allows an OTP-verified user to set a password for future email & password logins.
-- **Request Body:**
-  ```json
-  {
-    "email": "priya@example.com",
-    "password": "mySecurePassword123"
-  }
-  ```
-- **Response (200 OK):**
-  ```json
-  {
-    "message": "Password created successfully. You can now login with password."
-  }
-  ```
-
----
-
-### 1.4 Login (Email & Password)
-- **Endpoint:** `POST /api/auth/login`
-- **Description:** Authenticate existing user with password and receive a fresh JWT token.
-- **Request Body:**
-  ```json
-  {
-    "email": "priya@example.com",
-    "password": "mySecurePassword123"
-  }
-  ```
-- **Response (200 OK):**
-  ```json
-  {
-    "token": "eyJhbGciOiJIUzI1NiIsIn...",
-    "user": {
-      "id": "673f4e19876a1c5d01234567",
-      "fullName": "Priya Sharma",
-      "name": "Priya Sharma",
-      "email": "priya@example.com",
-      "mobileNumber": "9876543210",
-      "phone": "9876543210",
-      "avatar": "",
-      "tier": "Royal Member",
-      "rewardPoints": 0
     }
   }
   ```
@@ -137,7 +107,7 @@
       "fullName": "Priya Sharma",
       "name": "Priya Sharma",
       "email": "priya@example.com",
-      "mobileNumber": "9876543210",
+      "mobileNumber": "",
       "tier": "Royal Member",
       "rewardPoints": 0,
       "isVerified": true
@@ -372,4 +342,3 @@
 
 ### 6.5 Delete Artist
 - **Endpoint:** `DELETE /api/artists/:id`
-

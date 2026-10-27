@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
@@ -14,12 +13,50 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Generate 6-digit OTP
+// Generate 6-digit numeric OTP
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// 1. Register: Send OTP to Email (fullName / name + email)
+// Helper: Send OTP Email
+const sendOTPEmail = async (email, name, otp, purpose = 'registration') => {
+  console.log(`\n========================================`);
+  console.log(`[AUTH] ${purpose.toUpperCase()} OTP for ${email}: ${otp}`);
+  console.log(`========================================\n`);
+
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    return false;
+  }
+
+  try {
+    const mailOptions = {
+      from: `"Nihara D'Aura" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `Your OTP for Nihara D'Aura`,
+      text: `Hello ${name || 'User'},\n\nYour OTP is: ${otp}\nIt is valid for 10 minutes.\n\nThank you,\nNihara D'Aura Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #f0e6d2; border-radius: 10px; background-color: #fffdfa;">
+          <h2 style="color: #2b1f14; text-align: center; margin-bottom: 8px;">Nihara D'Aura</h2>
+          <p style="color: #6d5b45; text-align: center; font-size: 14px; margin-top: 0;">Luxury Bridal, Jewellery & Self-Care</p>
+          <hr style="border: 0; border-top: 1px solid #ebdcc5; margin: 20px 0;" />
+          <p style="color: #333; font-size: 15px;">Hello <strong>${name || 'Valued Guest'}</strong>,</p>
+          <p style="color: #555; font-size: 14px; line-height: 1.5;">Please use the one-time password (OTP) below to complete your authentication:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #b38728; background: #faf4e8; padding: 14px 28px; border: 1px dashed #b38728; border-radius: 8px; display: inline-block;">${otp}</span>
+          </div>
+          <p style="color: #888; font-size: 13px; text-align: center;">This OTP is valid for <strong>10 minutes</strong>. Do not share this code with anyone.</p>
+        </div>
+      `
+    };
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (err) {
+    console.error('Nodemailer error (Check EMAIL_USER and EMAIL_PASS in .env):', err.message);
+    return false;
+  }
+};
+
+// 1. Register: Create Account with Name & Email -> Send OTP
 router.post('/register', async (req, res) => {
   try {
     const { fullName, name, email, mobileNumber, phone, avatar } = req.body;
@@ -31,9 +68,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'fullName (or name) and email are required' });
     }
 
-    let user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase().trim();
+    let user = await User.findOne({ email: normalizedEmail });
+
     if (user && user.isVerified) {
-      return res.status(400).json({ error: 'User with this email already exists' });
+      return res.status(400).json({ error: 'User with this email already exists. Please login instead.' });
     }
 
     const otp = generateOTP();
@@ -41,65 +80,35 @@ router.post('/register', async (req, res) => {
 
     if (!user) {
       user = new User({
-        fullName: resolvedName,
-        name: resolvedName,
-        email: email.toLowerCase(),
-        mobileNumber: resolvedPhone,
-        phone: resolvedPhone,
+        fullName: resolvedName.trim(),
+        name: resolvedName.trim(),
+        email: normalizedEmail,
+        mobileNumber: resolvedPhone.trim(),
+        phone: resolvedPhone.trim(),
         otp,
         otpExpires,
         avatar: avatar || '',
         isVerified: false,
       });
     } else {
+      user.fullName = resolvedName.trim();
+      user.name = resolvedName.trim();
+      if (resolvedPhone) {
+        user.mobileNumber = resolvedPhone.trim();
+        user.phone = resolvedPhone.trim();
+      }
       user.otp = otp;
       user.otpExpires = otpExpires;
-      user.fullName = resolvedName;
-      user.name = resolvedName;
-      if (resolvedPhone) {
-        user.mobileNumber = resolvedPhone;
-        user.phone = resolvedPhone;
-      }
       if (avatar) user.avatar = avatar;
     }
-    
+
     await user.save();
 
-    console.log(`\n========================================`);
-    console.log(`[AUTH] Registration OTP for ${email}: ${otp}`);
-    console.log(`========================================\n`);
+    const emailSent = await sendOTPEmail(normalizedEmail, resolvedName, otp, 'Registration');
 
-    // Send Email via Nodemailer
-    let emailSent = false;
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-      try {
-        const mailOptions = {
-          from: `"Nihara D'Aura" <${process.env.EMAIL_USER}>`,
-          to: email,
-          subject: 'Your Verification OTP - Nihara D\'Aura',
-          text: `Hello ${resolvedName},\n\nYour OTP for registration is: ${otp}\nIt will expire in 10 minutes.\n\nThank you,\nNihara D'Aura Team`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-              <h2 style="color: #333; text-align: center;">Welcome to Nihara D'Aura</h2>
-              <p>Hello <strong>${resolvedName}</strong>,</p>
-              <p>Thank you for registering. Please use the OTP below to verify your account:</p>
-              <div style="text-align: center; margin: 30px 0;">
-                <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #d4af37; background: #fafafa; padding: 12px 24px; border: 1px dashed #d4af37; border-radius: 6px;">${otp}</span>
-              </div>
-              <p style="color: #666; font-size: 13px;">This OTP will expire in 10 minutes. If you did not request this, please ignore this email.</p>
-            </div>
-          `
-        };
-        await transporter.sendMail(mailOptions);
-        emailSent = true;
-      } catch (mailErr) {
-        console.error('Nodemailer error (Check email credentials/App Password):', mailErr.message);
-      }
-    }
-
-    res.status(200).json({ 
-      message: emailSent ? 'OTP sent successfully to email' : 'OTP generated successfully (check server logs in dev mode)',
-      email: email.toLowerCase()
+    res.status(200).json({
+      message: emailSent ? 'OTP sent successfully to your email' : 'OTP generated successfully (check server logs in dev)',
+      email: normalizedEmail
     });
   } catch (error) {
     console.error('Error in register:', error);
@@ -107,7 +116,43 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// 2. Verify OTP: Account created & verified, returns token and user
+// 2. Login: Existing user requests OTP via Email (No password required)
+router.post('/login', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'email is required' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(404).json({ error: 'No account found with this email. Please register first.' });
+    }
+
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    const userName = user.fullName || user.name || 'User';
+    const emailSent = await sendOTPEmail(normalizedEmail, userName, otp, 'Login');
+
+    res.status(200).json({
+      message: emailSent ? 'Login OTP sent successfully to your email' : 'Login OTP generated successfully (check server logs in dev)',
+      email: normalizedEmail
+    });
+  } catch (error) {
+    console.error('Error in login:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 3. Verify OTP: Verifies OTP, activates account & returns JWT auth token + user profile
 router.post('/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -116,16 +161,18 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'email and otp are required' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (user.otp !== String(otp).trim() || user.otpExpires < new Date()) {
+    if (user.otp !== String(otp).trim() || !user.otpExpires || user.otpExpires < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
+    // Mark verified and clear OTP
     user.isVerified = true;
     user.otp = undefined;
     user.otpExpires = undefined;
@@ -134,10 +181,10 @@ router.post('/verify-otp', async (req, res) => {
     // Generate JWT Token
     const jwtSecret = process.env.JWT_SECRET || 'secret123';
     const payload = { user: { id: user.id } };
-    const token = jwt.sign(payload, jwtSecret, { expiresIn: '7d' });
+    const token = jwt.sign(payload, jwtSecret, { expiresIn: '30d' });
 
     res.status(200).json({
-      message: 'Account verified and created successfully',
+      message: 'Account verified successfully',
       token,
       user: {
         id: user.id,
@@ -154,89 +201,6 @@ router.post('/verify-otp', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in verify-otp:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// 3. Create / Set Password (Optional step)
-router.post('/create-password', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'email and password are required' });
-    }
-
-    const user = await User.findOne({ email: email.toLowerCase() });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (!user.isVerified) {
-      return res.status(400).json({ error: 'User email is not verified' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
-    await user.save();
-
-    res.status(200).json({ message: 'Password created successfully. You can now login with password.' });
-  } catch (error) {
-    console.error('Error in create-password:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// 4. Login with Email & Password
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'email and password are required' });
-    }
-
-    const user = await User.findOne({ email: email.toLowerCase() });
-
-    if (!user || !user.isVerified) {
-      return res.status(400).json({ error: 'Invalid credentials or user not verified' });
-    }
-
-    if (!user.password) {
-      return res.status(400).json({ error: 'Password not set. Please create a password.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid credentials' });
-    }
-
-    // JWT Token
-    const jwtSecret = process.env.JWT_SECRET || 'secret123';
-    const payload = { user: { id: user.id } };
-
-    jwt.sign(payload, jwtSecret, { expiresIn: '7d' }, (err, token) => {
-      if (err) throw err;
-      res.status(200).json({
-        token,
-        user: {
-          id: user.id,
-          fullName: user.fullName || user.name,
-          name: user.name || user.fullName,
-          email: user.email,
-          mobileNumber: user.mobileNumber || user.phone || '',
-          phone: user.phone || user.mobileNumber || '',
-          avatar: user.avatar || '',
-          tier: user.tier || 'Royal Member',
-          rewardPoints: user.rewardPoints || 0,
-        }
-      });
-    });
-
-  } catch (error) {
-    console.error('Error in login:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
