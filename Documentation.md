@@ -1,7 +1,6 @@
 # Nihara D Aura - Backend API Documentation
 
-> **Production Base URL:** `https://www.niharadaura.com` (Live)  
-> **Development Base URL:** `http://localhost:3000` (Local)  
+> **Production Base URL:** `https://www.niharadaura.com` (Live)   
 > **Database:** Connected to MongoDB Atlas `nihara_d_aura`
 
 ---
