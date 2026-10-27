@@ -1,6 +1,7 @@
 # Nihara D'Aura - Backend API Documentation
 
-> **Base URL:** `http://localhost:3000`  
+> **Production Base URL:** `https://www.niharadaura.com` (Live)  
+> **Development Base URL:** `http://localhost:3000` (Local)  
 > **Database:** MongoDB Atlas (`nihara_d_aura`)  
 > **Headers Required:** `Content-Type: application/json`  
 > *(Protected routes will require `Authorization: Bearer <token>`)*
