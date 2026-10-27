@@ -7,20 +7,25 @@ Database: Connected to MongoDB `nihara_d_aura`
 ## 1. Authentication Flow (`/api/auth`)
 
 ### `POST /api/auth/register`
-- **Description:** Register a new user and generate a 6-digit OTP (sent to email & logged for dev).
+- **Description:** Register a new user with Full Name & Email. Generates a 6-digit OTP (sent to user email & logged in console).
 - **Body Fields:**
   ```json
   {
     "fullName": "Rahul Kumar",
-    "email": "rahul@example.com",
-    "mobileNumber": "9876543210",
-    "avatar": "https://example.com/avatar.jpg"
+    "email": "rahul@example.com"
   }
   ```
-  *(Accepts either `fullName` or `name`, and either `mobileNumber` or `phone`)*
+  *(Accepts `fullName` or `name`, and `email`. Optional: `mobileNumber`, `phone`, `avatar`)*
+- **Response (200 OK):**
+  ```json
+  {
+    "message": "OTP sent successfully to email",
+    "email": "rahul@example.com"
+  }
+  ```
 
 ### `POST /api/auth/verify-otp`
-- **Description:** Verify the OTP sent to user's email.
+- **Description:** Verify the OTP sent to email. Once verified, account is created and activated immediately, returning the auth JWT token and complete user profile.
 - **Body Fields:**
   ```json
   {
@@ -28,9 +33,28 @@ Database: Connected to MongoDB `nihara_d_aura`
     "otp": "123456"
   }
   ```
+- **Response (200 OK):**
+  ```json
+  {
+    "message": "Account verified and created successfully",
+    "token": "eyJhbGciOiJIUzI1NiIsIn...",
+    "user": {
+      "id": "6ace1ee8bac99793e66c0c76",
+      "fullName": "Rahul Kumar",
+      "name": "Rahul Kumar",
+      "email": "rahul@example.com",
+      "mobileNumber": "",
+      "phone": "",
+      "avatar": "",
+      "tier": "Royal Member",
+      "rewardPoints": 0,
+      "isVerified": true
+    }
+  }
+  ```
 
-### `POST /api/auth/create-password`
-- **Description:** Set password after successful OTP verification.
+### `POST /api/auth/create-password` (Optional)
+- **Description:** Set password after OTP verification for password-based logins.
 - **Body Fields:**
   ```json
   {
@@ -40,7 +64,7 @@ Database: Connected to MongoDB `nihara_d_aura`
   ```
 
 ### `POST /api/auth/login`
-- **Description:** Login with verified credentials and receive JWT token.
+- **Description:** Login with Email and Password to get JWT token.
 - **Body Fields:**
   ```json
   {

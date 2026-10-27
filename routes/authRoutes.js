@@ -19,21 +19,21 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// 1. Register: Send OTP to Email
+// 1. Register: Send OTP to Email (fullName / name + email)
 router.post('/register', async (req, res) => {
   try {
     const { fullName, name, email, mobileNumber, phone, avatar } = req.body;
 
     const resolvedName = fullName || name;
-    const resolvedPhone = mobileNumber || phone;
+    const resolvedPhone = mobileNumber || phone || '';
 
-    if (!resolvedName || !email || !resolvedPhone) {
-      return res.status(400).json({ error: 'fullName (or name), email, and mobileNumber (or phone) are required' });
+    if (!resolvedName || !email) {
+      return res.status(400).json({ error: 'fullName (or name) and email are required' });
     }
 
     let user = await User.findOne({ email: email.toLowerCase() });
     if (user && user.isVerified) {
-      return res.status(400).json({ error: 'User with this email already exists and is verified' });
+      return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     const otp = generateOTP();
@@ -49,40 +49,65 @@ router.post('/register', async (req, res) => {
         otp,
         otpExpires,
         avatar: avatar || '',
+        isVerified: false,
       });
     } else {
       user.otp = otp;
       user.otpExpires = otpExpires;
       user.fullName = resolvedName;
       user.name = resolvedName;
-      user.mobileNumber = resolvedPhone;
-      user.phone = resolvedPhone;
+      if (resolvedPhone) {
+        user.mobileNumber = resolvedPhone;
+        user.phone = resolvedPhone;
+      }
       if (avatar) user.avatar = avatar;
     }
     
     await user.save();
 
-    console.log(`[DEV TEST] OTP for ${email} is: ${otp}`); // For testing without email
+    console.log(`\n========================================`);
+    console.log(`[AUTH] Registration OTP for ${email}: ${otp}`);
+    console.log(`========================================\n`);
 
-    // Send Email (Will only work if EMAIL_USER and EMAIL_PASS are set in .env)
+    // Send Email via Nodemailer
+    let emailSent = false;
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: 'Your OTP for Nihara D Aura',
-        text: `Hello ${resolvedName},\n\nYour OTP for registration is: ${otp}\nIt will expire in 10 minutes.`,
-      };
-      await transporter.sendMail(mailOptions);
+      try {
+        const mailOptions = {
+          from: `"Nihara D'Aura" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: 'Your Verification OTP - Nihara D\'Aura',
+          text: `Hello ${resolvedName},\n\nYour OTP for registration is: ${otp}\nIt will expire in 10 minutes.\n\nThank you,\nNihara D'Aura Team`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+              <h2 style="color: #333; text-align: center;">Welcome to Nihara D'Aura</h2>
+              <p>Hello <strong>${resolvedName}</strong>,</p>
+              <p>Thank you for registering. Please use the OTP below to verify your account:</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #d4af37; background: #fafafa; padding: 12px 24px; border: 1px dashed #d4af37; border-radius: 6px;">${otp}</span>
+              </div>
+              <p style="color: #666; font-size: 13px;">This OTP will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+            </div>
+          `
+        };
+        await transporter.sendMail(mailOptions);
+        emailSent = true;
+      } catch (mailErr) {
+        console.error('Nodemailer error (Check email credentials/App Password):', mailErr.message);
+      }
     }
 
-    res.status(200).json({ message: 'OTP sent successfully to email' });
+    res.status(200).json({ 
+      message: emailSent ? 'OTP sent successfully to email' : 'OTP generated successfully (check server logs in dev mode)',
+      email: email.toLowerCase()
+    });
   } catch (error) {
     console.error('Error in register:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// 2. Verify OTP
+// 2. Verify OTP: Account created & verified, returns token and user
 router.post('/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -97,7 +122,7 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (user.otp !== otp || user.otpExpires < new Date()) {
+    if (user.otp !== String(otp).trim() || user.otpExpires < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
@@ -106,14 +131,34 @@ router.post('/verify-otp', async (req, res) => {
     user.otpExpires = undefined;
     await user.save();
 
-    res.status(200).json({ message: 'OTP verified successfully. You can now create a password.' });
+    // Generate JWT Token
+    const jwtSecret = process.env.JWT_SECRET || 'secret123';
+    const payload = { user: { id: user.id } };
+    const token = jwt.sign(payload, jwtSecret, { expiresIn: '7d' });
+
+    res.status(200).json({
+      message: 'Account verified and created successfully',
+      token,
+      user: {
+        id: user.id,
+        fullName: user.fullName || user.name,
+        name: user.name || user.fullName,
+        email: user.email,
+        mobileNumber: user.mobileNumber || user.phone || '',
+        phone: user.phone || user.mobileNumber || '',
+        avatar: user.avatar || '',
+        tier: user.tier || 'Royal Member',
+        rewardPoints: user.rewardPoints || 0,
+        isVerified: user.isVerified
+      }
+    });
   } catch (error) {
     console.error('Error in verify-otp:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// 3. Create Password
+// 3. Create / Set Password (Optional step)
 router.post('/create-password', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -136,14 +181,14 @@ router.post('/create-password', async (req, res) => {
     user.password = await bcrypt.hash(password, salt);
     await user.save();
 
-    res.status(200).json({ message: 'Password created successfully. You can now login.' });
+    res.status(200).json({ message: 'Password created successfully. You can now login with password.' });
   } catch (error) {
     console.error('Error in create-password:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// 4. Login
+// 4. Login with Email & Password
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -181,11 +226,11 @@ router.post('/login', async (req, res) => {
           fullName: user.fullName || user.name,
           name: user.name || user.fullName,
           email: user.email,
-          mobileNumber: user.mobileNumber || user.phone,
-          phone: user.phone || user.mobileNumber,
-          avatar: user.avatar,
-          tier: user.tier,
-          rewardPoints: user.rewardPoints,
+          mobileNumber: user.mobileNumber || user.phone || '',
+          phone: user.phone || user.mobileNumber || '',
+          avatar: user.avatar || '',
+          tier: user.tier || 'Royal Member',
+          rewardPoints: user.rewardPoints || 0,
         }
       });
     });
