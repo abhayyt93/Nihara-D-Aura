@@ -8,9 +8,11 @@ const PORT = process.env.PORT || 3000;
 // MongoDB Connection
 const mongoose = require('mongoose');
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log(`Connected to MongoDB successfully! Database: ${mongoose.connection.name}`))
-  .catch((err) => console.error('Error connecting to MongoDB:', err));
+if (process.env.MONGO_URI) {
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log(`Connected to MongoDB successfully! Database: ${mongoose.connection.name}`))
+    .catch((err) => console.error('Error connecting to MongoDB:', err));
+}
 
 app.use(cors());
 app.use(express.json());
@@ -36,6 +38,10 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/artists', artistRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
