@@ -1,6 +1,7 @@
 # Nihara D'Aura - Backend API Documentation
 
-> **Production Base URL:** `https://www.niharadaura.com` (Live)  
+> **AWS Live Server Base URL:** `http://32.236.58.112` (AWS EC2 Production)  
+> **Production Base URL:** `https://www.niharadaura.com` (Live Domain)  
 > **Development Base URL:** `http://localhost:3000` (Local)  
 > **Database:** MongoDB Atlas (`nihara_d_aura`)  
 > **Headers Required:** `Content-Type: application/json`  
