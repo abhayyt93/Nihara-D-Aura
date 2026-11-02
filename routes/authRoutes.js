@@ -4,14 +4,28 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
-// Configure Nodemailer
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Configure Nodemailer (Hostinger SMTP for official domain / Gmail for personal)
+const isGmail = (process.env.EMAIL_USER || '').toLowerCase().endsWith('@gmail.com');
+
+const transporter = nodemailer.createTransport(
+  isGmail
+    ? {
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      }
+    : {
+        host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
+        port: parseInt(process.env.EMAIL_PORT || '465', 10),
+        secure: true,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      }
+);
 
 // Generate 6-digit numeric OTP
 const generateOTP = () => {
