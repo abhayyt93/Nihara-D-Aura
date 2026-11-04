@@ -4,14 +4,28 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
-// Configure Nodemailer
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Configure Nodemailer (Hostinger SMTP for official domain / Gmail for personal)
+const isGmail = (process.env.EMAIL_USER || '').toLowerCase().endsWith('@gmail.com');
+
+const transporter = nodemailer.createTransport(
+  isGmail
+    ? {
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      }
+    : {
+        host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
+        port: parseInt(process.env.EMAIL_PORT || '465', 10),
+        secure: true,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      }
+);
 
 // Generate 6-digit numeric OTP
 const generateOTP = () => {
@@ -65,14 +79,14 @@ router.post('/register', async (req, res) => {
     const resolvedPhone = mobileNumber || phone || '';
 
     if (!resolvedName || !email) {
-      return res.status(400).json({ error: 'fullName (or name) and email are required' });
+      return res.status(400).json({ success: false, error: 'fullName (or name) and email are required', message: 'fullName and email are required' });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
     let user = await User.findOne({ email: normalizedEmail });
 
     if (user && user.isVerified) {
-      return res.status(400).json({ error: 'User with this email already exists. Please login instead.' });
+      return res.status(400).json({ success: false, error: 'User with this email already exists. Please login instead.', message: 'User with this email already exists. Please login instead.' });
     }
 
     const otp = generateOTP();
@@ -107,29 +121,36 @@ router.post('/register', async (req, res) => {
     const emailSent = await sendOTPEmail(normalizedEmail, resolvedName, otp, 'Registration');
 
     res.status(200).json({
+      success: true,
       message: emailSent ? 'OTP sent successfully to your email' : 'OTP generated successfully (check server logs in dev)',
       email: normalizedEmail
     });
   } catch (error) {
     console.error('Error in register:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ success: false, error: 'Internal server error', message: 'Internal server error' });
   }
 });
 
-// 2. Login: Existing user requests OTP via Email (No password required)
+// 2. Login: Existing user requests OTP via Email
 router.post('/login', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, phone } = req.body;
+    const identifier = (email || phone || '').toLowerCase().trim();
 
-    if (!email) {
-      return res.status(400).json({ error: 'email is required' });
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: 'email or phone is required', message: 'email or phone is required' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({
+      $or: [
+        { email: identifier },
+        { phone: identifier },
+        { mobileNumber: identifier }
+      ]
+    });
 
     if (!user) {
-      return res.status(404).json({ error: 'No account found with this email. Please register first.' });
+      return res.status(404).json({ success: false, error: 'No account found with this email/phone. Please register first.', message: 'No account found with this email/phone. Please register first.' });
     }
 
     const otp = generateOTP();
@@ -140,15 +161,16 @@ router.post('/login', async (req, res) => {
     await user.save();
 
     const userName = user.fullName || user.name || 'User';
-    const emailSent = await sendOTPEmail(normalizedEmail, userName, otp, 'Login');
+    const emailSent = await sendOTPEmail(user.email, userName, otp, 'Login');
 
     res.status(200).json({
+      success: true,
       message: emailSent ? 'Login OTP sent successfully to your email' : 'Login OTP generated successfully (check server logs in dev)',
-      email: normalizedEmail
+      email: user.email
     });
   } catch (error) {
     console.error('Error in login:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ success: false, error: 'Internal server error', message: 'Internal server error' });
   }
 });
 
@@ -158,18 +180,24 @@ router.post('/verify-otp', async (req, res) => {
     const { email, otp } = req.body;
 
     if (!email || !otp) {
-      return res.status(400).json({ error: 'email and otp are required' });
+      return res.status(400).json({ success: false, error: 'email and otp are required', message: 'email and otp are required' });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({
+      $or: [
+        { email: normalizedEmail },
+        { phone: normalizedEmail },
+        { mobileNumber: normalizedEmail }
+      ]
+    });
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ success: false, error: 'User not found', message: 'User not found' });
     }
 
     if (user.otp !== String(otp).trim() || !user.otpExpires || user.otpExpires < new Date()) {
-      return res.status(400).json({ error: 'Invalid or expired OTP' });
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP', message: 'Invalid or expired OTP' });
     }
 
     // Mark verified and clear OTP
@@ -184,10 +212,12 @@ router.post('/verify-otp', async (req, res) => {
     const token = jwt.sign(payload, jwtSecret, { expiresIn: '30d' });
 
     res.status(200).json({
+      success: true,
       message: 'Account verified successfully',
       token,
       user: {
         id: user.id,
+        _id: user.id,
         fullName: user.fullName || user.name,
         name: user.name || user.fullName,
         email: user.email,
@@ -196,12 +226,64 @@ router.post('/verify-otp', async (req, res) => {
         avatar: user.avatar || '',
         tier: user.tier || 'Royal Member',
         rewardPoints: user.rewardPoints || 0,
+        role: user.role || 'user',
         isVerified: user.isVerified
       }
     });
   } catch (error) {
     console.error('Error in verify-otp:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ success: false, error: 'Internal server error', message: 'Internal server error' });
+  }
+});
+
+// 4. Validate saved session and return current user profile (GET /api/auth/me)
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const jwtSecret = process.env.JWT_SECRET || 'secret123';
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, jwtSecret);
+    } catch (err) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    }
+
+    const userId = decoded.user?.id || decoded.id;
+    const user = await User.findById(userId).select('-password -otp -otpExpires');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user.id,
+        _id: user.id,
+        fullName: user.fullName || user.name,
+        name: user.name || user.fullName,
+        email: user.email,
+        mobileNumber: user.mobileNumber || user.phone || '',
+        phone: user.phone || user.mobileNumber || '',
+        avatar: user.avatar || '',
+        tier: user.tier || 'Royal Member',
+        rewardPoints: user.rewardPoints || 0,
+        role: user.role || 'user',
+        isVerified: user.isVerified,
+        addresses: user.addresses || [],
+        wishlist: user.wishlist || [],
+        cart: user.cart || []
+      }
+    });
+  } catch (error) {
+    console.error('Error in /auth/me:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 

@@ -1,15 +1,21 @@
 {
-  "name": "kosmatic-backend",
+  "name": "nihara-d-aura-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Nihara D'Aura Official Backend API",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "nihara",
+    "nihara-d-aura",
+    "ecommerce",
+    "backend",
+    "api"
+  ],
+  "author": "Nihara D'Aura",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -18,7 +24,8 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.5",
-    "nodemailer": "^10.0.3"
+    "nodemailer": "^10.0.3",
+    "socket.io": "^4.8.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

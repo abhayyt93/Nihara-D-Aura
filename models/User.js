@@ -31,6 +31,11 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user',
+  },
   tier: {
     type: String,
     default: 'Royal Member',
@@ -39,6 +44,26 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  addresses: [{
+    id: { type: String, default: () => `addr_${Date.now()}` },
+    fullName: String,
+    phone: String,
+    street: String,
+    city: String,
+    state: String,
+    pincode: String,
+    tag: { type: String, default: 'Home' },
+    isDefault: { type: Boolean, default: false }
+  }],
+  wishlist: [{
+    type: String
+  }],
+  cart: [{
+    productId: String,
+    quantity: { type: Number, default: 1 },
+    variant: String,
+    size: String
+  }],
   isVerified: {
     type: Boolean,
     default: false,
